@@ -379,6 +379,7 @@ h2 { font-size: 16px; }
 // =========================================================
 const LS_URL='attend_webapp_url';
 const LS_KEY='attend_api_key';
+const DEFAULT_WEBAPP_URL='https://script.google.com/macros/s/AKfycbwZ4yJf31Ka9cVvcOPznMijRkV9qgGGUpqmzjqddKvV-vIF_y2ktjAD-_0nKRxMEw7jiw/exec';
 
 function isGasHost(){
   // 外部ホストでは google.script.run のポリフィルを定義するため「存在チェック」だと誤判定します。
@@ -392,8 +393,12 @@ function loadSettings(){
   const k = localStorage.getItem(LS_KEY)||'';
   const urlEl = document.getElementById('webappUrl');
   const keyEl = document.getElementById('apiKey');
-  if(urlEl) urlEl.value = u;
+  const initialUrl = u || DEFAULT_WEBAPP_URL;
+  if(urlEl) urlEl.value = initialUrl;
   if(keyEl) keyEl.value = k;
+  if(!u){
+    try{ localStorage.setItem(LS_URL, DEFAULT_WEBAPP_URL); }catch(e){}
+  }
 }
 
 function saveSettings(){
