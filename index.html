@@ -179,23 +179,6 @@
     }
   })();
 </script>
-
-<style>
-body { font-size: 14px; padding: 10px; }
-.card, .section { padding: 12px; margin-bottom: 12px; border-radius: 12px; }
-input, select, textarea { font-size: 14px; padding: 10px; border-radius: 10px; }
-button { font-size: 15px; padding: 12px; border-radius: 12px; }
-button.primary { padding: 14px; font-size: 16px; }
-.radio-group { display: flex; gap: 12px; align-items: center; }
-.radio-group label { font-size: 14px; }
-input[type="radio"] { transform: scale(1.2); margin-right: 4px; }
-input[type="date"], input[type="time"] { font-size: 14px; padding: 8px; }
-.time-button { width: 60px; height: 60px; font-size: 12px; }
-h1 { font-size: 20px; }
-h2 { font-size: 16px; }
-.box { padding: 12px; border-radius: 12px; font-size: 14px; }
-</style>
-
 </head>
 
 <body>
@@ -379,7 +362,6 @@ h2 { font-size: 16px; }
 // =========================================================
 const LS_URL='attend_webapp_url';
 const LS_KEY='attend_api_key';
-const DEFAULT_WEBAPP_URL='https://script.google.com/macros/s/AKfycbwZ4yJf31Ka9cVvcOPznMijRkV9qgGGUpqmzjqddKvV-vIF_y2ktjAD-_0nKRxMEw7jiw/exec';
 
 function isGasHost(){
   // 外部ホストでは google.script.run のポリフィルを定義するため「存在チェック」だと誤判定します。
@@ -393,12 +375,8 @@ function loadSettings(){
   const k = localStorage.getItem(LS_KEY)||'';
   const urlEl = document.getElementById('webappUrl');
   const keyEl = document.getElementById('apiKey');
-  const initialUrl = u || DEFAULT_WEBAPP_URL;
-  if(urlEl) urlEl.value = initialUrl;
+  if(urlEl) urlEl.value = u;
   if(keyEl) keyEl.value = k;
-  if(!u){
-    try{ localStorage.setItem(LS_URL, DEFAULT_WEBAPP_URL); }catch(e){}
-  }
 }
 
 function saveSettings(){
@@ -418,7 +396,7 @@ function getBase(){
       const ext = document.getElementById('extSettings');
       if (ext) ext.style.display='block';
     }catch(e){}
-    throw new Error('APIキー保存後にページを更新してください。');
+    throw new Error('外部ホストでは「GAS WebアプリURL（.../exec）」と「APIキー」を入力して保存してください。');
   }
   return {url, key};
 }
@@ -436,7 +414,7 @@ function apiJsonpRaw(fn, argsArray){
     getFaceDescriptors: [],
     getNameMasterOptions: [],
     getWeeklyStatus: ['name'],
-    recordAttendance: ['name','kind'],
+    recordAttendance: ['name','kind','deviceInfo'],
     recordPrivateOuting: ['name','kind','memo'],
     editAttendance: ['name','dateStr','field','mode','timeStr','freeText'],
     saveFaceDescriptors: ['name','descriptorsJson'],
@@ -648,6 +626,30 @@ function apiPing(){
   apiJsonpRaw('ping', [])
     .then(p=>alert(JSON.stringify(p)))
     .catch(e=>alert('ping NG: '+e.message));
+}
+
+function buildDeviceInfo(){
+  const nav = window.navigator || {};
+  const scr = window.screen || {};
+  let tz = '';
+  try{ tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){}
+  return {
+    ua: nav.userAgent || '',
+    platform: nav.platform || '',
+    language: nav.language || '',
+    screen: `${scr.width || 0}x${scr.height || 0}`,
+    tz: tz,
+    touch: (('ontouchstart' in window) || (nav.maxTouchPoints || 0) > 0)
+  };
+}
+
+function buildDeviceInfoJson(){
+  try{ return JSON.stringify(buildDeviceInfo()); }catch(e){ return '{}'; }
+}
+
+function buildDeviceAlertMessage_(result){
+  if(!result || !result.deviceLog || !result.deviceLog.suspicious) return '';
+  return '\n\n※この端末は「要確認端末」として記録されました。';
 }
 
 
@@ -1293,11 +1295,12 @@ async function loadDescriptors(){
       statusEl.textContent = '出勤を記録中...';
       log(`出勤打刻: ${recognizedName}, kind=${kind}`);
 
-      callApi('recordAttendance', [recognizedName, kind])
+      const deviceInfoJson = buildDeviceInfoJson();
+      callApi('recordAttendance', [recognizedName, kind, deviceInfoJson])
         .then(function (result) {
           statusEl.textContent = '出勤を記録しました。';
           log(`出勤OK: ${result.sheet} R${result.row}C${result.col}="${result.value}"`);
-          alert(`出勤を記録しました。\n${recognizedName}\n値: ${result.value}`);
+          alert(`出勤を記録しました。\n${recognizedName}\n値: ${result.value}${buildDeviceAlertMessage_(result)}`);
           loadWeeklyStatus();
           touchInactivityTimer();
         })
@@ -1317,11 +1320,12 @@ async function loadDescriptors(){
       statusEl.textContent = '退勤を記録中...';
       log(`退勤打刻: ${recognizedName}, kind=${kind}`);
 
-      callApi('recordAttendance', [recognizedName, kind])
+      const deviceInfoJson = buildDeviceInfoJson();
+      callApi('recordAttendance', [recognizedName, kind, deviceInfoJson])
         .then(function (result) {
           statusEl.textContent = '退勤を記録しました。';
           log(`退勤OK: ${result.sheet} R${result.row}C${result.col}="${result.value}"`);
-          alert(`退勤を記録しました。\n${recognizedName}\n値: ${result.value}`);
+          alert(`退勤を記録しました。\n${recognizedName}\n値: ${result.value}${buildDeviceAlertMessage_(result)}`);
           loadWeeklyStatus();
           touchInactivityTimer();
         })
