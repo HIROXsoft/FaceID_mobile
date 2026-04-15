@@ -53,6 +53,7 @@
       margin: 6px 6px 6px 0;
     }
     .btn-primary{ background:#1976d2; border-color:#1976d2; color:#fff; }
+    .warn{ background:#fff3cd; border-color:#ffe69c; }
 
     #log {
       font-size: 0.85rem;
@@ -419,7 +420,8 @@ function apiJsonpRaw(fn, argsArray){
     editAttendance: ['name','dateStr','field','mode','timeStr','freeText'],
     saveFaceDescriptors: ['name','descriptorsJson'],
     listPendingEditsForConfirmer: ['confirmer'],
-    approveEdit: ['rowNo','confirmer']
+    approveEdit: ['rowNo','confirmer'],
+    deleteEdit: ['rowNo','confirmer']
   };
   const keys = map[fn];
   if(!keys) throw new Error('unknown api fn: '+fn);
@@ -685,7 +687,8 @@ function renderApproveRows(rows){
     const tr=document.createElement('tr');
     tr.innerHTML = `
       <td style="border-bottom:1px solid #eee;padding:8px 6px;">
-        <button class="btn btn-primary" data-row="${esc(r.rowNo)}">承認</button>
+        <button class="btn btn-primary" data-action="approve" data-row="${esc(r.rowNo)}">承認</button>
+        <button class="btn warn" data-action="delete" data-row="${esc(r.rowNo)}">削除</button>
       </td>
       <td style="border-bottom:1px solid #eee;padding:8px 6px;">${esc(r.userName || r.name || r.target || '')}</td>
       <td style="border-bottom:1px solid #eee;padding:8px 6px;">${esc(r.date||r.dateStr||'')}</td>
@@ -696,14 +699,17 @@ function renderApproveRows(rows){
       </td>
     `;
     tbody.appendChild(tr);
-    tr.querySelector('button').addEventListener('click', ()=>{
+    tr.querySelectorAll('button').forEach(btn=>btn.addEventListener('click', ()=>{
       const rowNo = Number(r.rowNo||0);
       if(!rowNo) return alert('rowNoが不正です');
       if(!recognizedName) return alert('先に顔認証してください');
-      callApi('approveEdit', [rowNo, recognizedName])
-        .then(()=>{ alert('承認しました'); loadPendingEdits(true); })
-        .catch(err=>alert('承認NG: '+(err&&err.message?err.message:String(err))));
-    });
+      const action = btn.dataset.action || 'approve';
+      const fn = (action === 'delete') ? 'deleteEdit' : 'approveEdit';
+      const label = (action === 'delete') ? '削除' : '承認';
+      callApi(fn, [rowNo, recognizedName])
+        .then(()=>{ alert(label + 'しました'); loadPendingEdits(true); })
+        .catch(err=>alert(label + 'NG: '+(err&&err.message?err.message:String(err))));
+    }));
   });
 }
 
